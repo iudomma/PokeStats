@@ -1,33 +1,32 @@
 package com.example.pokestats.service;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.example.pokestats.dto.PokemonExp;
+import com.example.pokestats.dto.PokemonHeight;
 import com.example.pokestats.dto.PokemonInfo;
 import com.example.pokestats.dto.PokemonResponseExp;
 import com.example.pokestats.dto.PokemonResponseHeight;
 import com.example.pokestats.dto.PokemonResponseWeight;
-import com.example.pokestats.dto.PokemonUri;
+import com.example.pokestats.dto.PokemonWeight;
 import com.example.pokestats.dto.PokemonsGeneral;
 import com.example.pokestats.mapper.ExpMapper;
 import com.example.pokestats.mapper.HeightMapper;
 import com.example.pokestats.mapper.WeightMapper;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
 public class AsyncPokemonService {
 
 	@Autowired
 	private WebClient webClient;
-	@Autowired
-	private RestTemplate restTemplate;
 	@Autowired
 	private WeightMapper weightMapper;
 	@Autowired
@@ -37,133 +36,95 @@ public class AsyncPokemonService {
 
 	String url = "https://pokeapi.co/api/v2/pokemon/";
 
-//	public PokemonResponseWeight getPokemonWeightDefault() {
-//
-//		PokemonsGeneral pokemonGeneral = restTemplate.getForObject(url, PokemonsGeneral.class);
-//		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
-//
-//		getPokemonNext(pokemonGeneral, pokeInfo);
-//
-//		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
-//		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-//		PokemonResponseWeight rsp = new PokemonResponseWeight();
-//
-//		rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
-//		return rsp;
-//	}
-//
-//	public ArrayList<PokemonInfo> getPokemonGeneral() {
-//
-//		PokemonsGeneral pokemonGeneral = restTemplate.getForObject(url, PokemonsGeneral.class);
-//		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
-//
-//		getPokemonNext(pokemonGeneral, pokeInfo);
-//
-//		return pokeInfo;
-//	}
+	public Mono<PokemonResponseWeight> findWeight(Long offset) {
 
-	public ArrayList<PokemonInfo> getPokemonGeneralWebClient() {
+		return getPokemonNextWebClientOffset(offset).map(pokeInfo -> {
+
+			pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
+
+			List<PokemonInfo> list = pokeInfo.subList(0, Math.min(5, pokeInfo.size()));
+
+			PokemonResponseWeight rsp = new PokemonResponseWeight();
+
+			rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
+
+			return rsp;
+		});
+	}
+
+	public Mono<PokemonResponseHeight> findHeight(Long offset) {
+
+		return getPokemonNextWebClientOffset(offset).map(pokeInfo -> {
+
+			pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getHeight).reversed());
+
+			List<PokemonInfo> list = pokeInfo.subList(0, Math.min(5, pokeInfo.size()));
+
+			PokemonResponseHeight rsp = new PokemonResponseHeight();
+
+			rsp.setPokemonHeight(heightMapper.toPokeHeight(list));
+
+			return rsp;
+		});
+	}
+
+	public Mono<PokemonResponseExp> findExp(Long offset) {
+
+		return getPokemonNextWebClientOffset(offset).map(pokeInfo -> {
+			pokeInfo.removeIf(o -> o.getBase_experience() == null);
+			pokeInfo.sort(Comparator.comparing(PokemonInfo::getBase_experience).reversed());
+			List<PokemonInfo> list = pokeInfo.subList(0, Math.min(5, pokeInfo.size()));
+
+			PokemonResponseExp rsp = new PokemonResponseExp();
+
+			rsp.setPokemonExp(expMapper.toPokeExp(list));
+
+			return rsp;
+		});
+	}
+
+	public Mono<List<PokemonInfo>> getPokemonNextWebClientOffset(Long offset) {
+
+		return webClient.get()
+				.uri(uriBuilder -> uriBuilder.path("/api/v2/pokemon/").queryParam("offset", offset)
+						.queryParam("limit", 250).build())
+				.retrieve().bodyToMono(PokemonsGeneral.class)
+
+				.flatMapMany(pokemonGeneral -> Flux.fromIterable(pokemonGeneral.getResults()))
+
+				.flatMap(uri -> webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class))
+
+				.collectList();
+	}
+
+	public Mono<List<PokemonWeight>> procesWeight() {
 
 		PokemonsGeneral pokemonGeneral = webClient.get().uri(url).retrieve().bodyToMono(PokemonsGeneral.class).block();
-		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
+		int numberOfCalls = Math.ceilDiv(pokemonGeneral.getCount(), 250);
 
-		getPokemonNextWebClient(pokemonGeneral, pokeInfo);
-
-		return pokeInfo;
+		return Flux.range(0, numberOfCalls).flatMap(i -> findWeight((long) i * 250))
+				.flatMapIterable(PokemonResponseWeight::getPokemonWeight)
+				.sort(Comparator.comparingInt(PokemonWeight::getWeight).reversed()).take(5).collectList();
 	}
 
-	public void getPokemonNextWebClient(PokemonsGeneral pokemonGeneral, ArrayList<PokemonInfo> pokeInfo) {
+	public Mono<List<PokemonHeight>> procesHeight() {
 
-		for (PokemonUri uri : pokemonGeneral.getResults()) {
-			pokeInfo.add(webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class).block());
+		PokemonsGeneral pokemonGeneral = webClient.get().uri(url).retrieve().bodyToMono(PokemonsGeneral.class).block();
+		int numberOfCalls = Math.ceilDiv(pokemonGeneral.getCount(), 250);
 
-		}
-
-		if (pokemonGeneral.getNext() != null) {
-			pokemonGeneral = webClient.get().uri(pokemonGeneral.getNext()).retrieve().bodyToMono(PokemonsGeneral.class)
-					.block();
-			getPokemonNext(pokemonGeneral, pokeInfo);
-		}
-
+		return Flux.range(0, numberOfCalls).flatMap(i -> findHeight((long) i * 250))
+				.flatMapIterable(PokemonResponseHeight::getPokemonHeight)
+				.sort(Comparator.comparingInt(PokemonHeight::getHeight).reversed()).take(5).collectList();
 	}
 
-	public void getPokemonNext(PokemonsGeneral pokemonGeneral, ArrayList<PokemonInfo> pokeInfo) {
+	public Mono<List<PokemonExp>> procesExp() {
 
-		for (PokemonUri uri : pokemonGeneral.getResults()) {
-			pokeInfo.add(webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class).block());
-
-		}
-
-		if (pokemonGeneral.getNext() != null) {
-			pokemonGeneral = webClient.get().uri(pokemonGeneral.getNext()).retrieve().bodyToMono(PokemonsGeneral.class)
-					.block();
-			getPokemonNext(pokemonGeneral, pokeInfo);
-		}
-
-	}
-
-	public PokemonResponseWeight getPokemonWeight() {
-
-		ArrayList<PokemonInfo> pokeInfo = getPokemonGeneralWebClient();
-
-		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
-		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-		PokemonResponseWeight rsp = new PokemonResponseWeight();
-
-		rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
-		return rsp;
-	}
-
-	public PokemonResponseHeight getPokemonHeight() {
-
-		ArrayList<PokemonInfo> pokeInfo = getPokemonGeneralWebClient();
-
-		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getHeight).reversed());
-		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-		PokemonResponseHeight rsp = new PokemonResponseHeight();
-
-		rsp.setPokemonInfo(heightMapper.toPokeHeight(list));
-		return rsp;
-	}
-
-	public PokemonResponseExp getPokemonExp() {
-
-		ArrayList<PokemonInfo> pokeInfo = getPokemonGeneralWebClient();
-		pokeInfo.removeIf(o -> o.getBase_experience() == null);
-		pokeInfo.sort(Comparator.comparingLong(PokemonInfo::getBase_experience).reversed());
-
-		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-		PokemonResponseExp rsp = new PokemonResponseExp();
-
-		rsp.setPokemonInfo(expMapper.toPokeExp(list));
-		return rsp;
-	}
-
-	@Async
-	public CompletableFuture<PokemonResponseWeight> findWeight(Long offset) throws InterruptedException {
-
-		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
-
-		getPokemonNextWebClientOffset(pokeInfo, offset);
-
-		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
-		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-		PokemonResponseWeight rsp = new PokemonResponseWeight();
-
-		rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
-		return CompletableFuture.completedFuture(rsp);
-	}
-
-	public void getPokemonNextWebClientOffset(ArrayList<PokemonInfo> pokeInfo, Long offset) {
-
-		PokemonsGeneral pokemonGeneral = webClient.get()
-				.uri(uriBuilder -> uriBuilder.path("/api/v2/pokemon/").queryParam("offset", offset.toString()).queryParam("limit", "250").build())
-				.retrieve().bodyToMono(PokemonsGeneral.class).block();
-
-		for (PokemonUri uri : pokemonGeneral.getResults()) {
-			pokeInfo.add(webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class).block());
-
-		}
+		PokemonsGeneral pokemonGeneral = webClient.get().uri(url).retrieve().bodyToMono(PokemonsGeneral.class).block();
+		int numberOfCalls = Math.ceilDiv(pokemonGeneral.getCount(), 250);
+		return Flux.range(0, numberOfCalls).flatMap(i -> findExp((long) i * 250))
+				.flatMapIterable(PokemonResponseExp::getPokemonExp)
+				.sort(Comparator.comparing(PokemonExp::getBase_experience, Comparator.reverseOrder())).take(5)
+				.collectList();
 	}
 
 }

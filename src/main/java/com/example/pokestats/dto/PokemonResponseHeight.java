@@ -6,11 +6,11 @@ public class PokemonResponseHeight {
 
 	private List<PokemonHeight> pokeHeight;
 
-	public List<PokemonHeight> getPokemonInfo() {
+	public List<PokemonHeight> getPokemonHeight() {
 		return pokeHeight;
 	}
 
-	public void setPokemonInfo(List<PokemonHeight> pokeHeight) {
+	public void setPokemonHeight(List<PokemonHeight> pokeHeight) {
 		this.pokeHeight = pokeHeight;
 	}
 

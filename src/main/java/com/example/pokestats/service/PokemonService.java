@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.example.pokestats.dto.PokemonInfo;
@@ -25,8 +24,6 @@ public class PokemonService {
 	@Autowired
 	private WebClient webClient;
 	@Autowired
-	private RestTemplate restTemplate;
-	@Autowired
 	private WeightMapper weightMapper;
 	@Autowired
 	private HeightMapper heightMapper;
@@ -34,31 +31,6 @@ public class PokemonService {
 	private ExpMapper expMapper;
 
 	String url = "https://pokeapi.co/api/v2/pokemon/";
-
-//	public PokemonResponseWeight getPokemonWeightDefault() {
-//
-//		PokemonsGeneral pokemonGeneral = restTemplate.getForObject(url, PokemonsGeneral.class);
-//		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
-//
-//		getPokemonNext(pokemonGeneral, pokeInfo);
-//
-//		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
-//		List<PokemonInfo> list = pokeInfo.subList(0, 5);
-//		PokemonResponseWeight rsp = new PokemonResponseWeight();
-//
-//		rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
-//		return rsp;
-//	}
-//
-//	public ArrayList<PokemonInfo> getPokemonGeneral() {
-//
-//		PokemonsGeneral pokemonGeneral = restTemplate.getForObject(url, PokemonsGeneral.class);
-//		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
-//
-//		getPokemonNext(pokemonGeneral, pokeInfo);
-//
-//		return pokeInfo;
-//	}
 
 	public ArrayList<PokemonInfo> getPokemonGeneralWebClient() {
 
@@ -80,22 +52,7 @@ public class PokemonService {
 		if (pokemonGeneral.getNext() != null) {
 			pokemonGeneral = webClient.get().uri(pokemonGeneral.getNext()).retrieve().bodyToMono(PokemonsGeneral.class)
 					.block();
-			getPokemonNext(pokemonGeneral, pokeInfo);
-		}
-
-	}
-
-	public void getPokemonNext(PokemonsGeneral pokemonGeneral, ArrayList<PokemonInfo> pokeInfo) {
-
-		for (PokemonUri uri : pokemonGeneral.getResults()) {
-			pokeInfo.add(webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class).block());
-
-		}
-
-		if (pokemonGeneral.getNext() != null) {
-			pokemonGeneral = webClient.get().uri(pokemonGeneral.getNext()).retrieve().bodyToMono(PokemonsGeneral.class)
-					.block();
-			getPokemonNext(pokemonGeneral, pokeInfo);
+			getPokemonNextWebClient(pokemonGeneral, pokeInfo);
 		}
 
 	}
@@ -120,7 +77,7 @@ public class PokemonService {
 		List<PokemonInfo> list = pokeInfo.subList(0, 5);
 		PokemonResponseHeight rsp = new PokemonResponseHeight();
 
-		rsp.setPokemonInfo(heightMapper.toPokeHeight(list));
+		rsp.setPokemonHeight(heightMapper.toPokeHeight(list));
 		return rsp;
 	}
 
@@ -133,7 +90,7 @@ public class PokemonService {
 		List<PokemonInfo> list = pokeInfo.subList(0, 5);
 		PokemonResponseExp rsp = new PokemonResponseExp();
 
-		rsp.setPokemonInfo(expMapper.toPokeExp(list));
+		rsp.setPokemonExp(expMapper.toPokeExp(list));
 		return rsp;
 	}
 

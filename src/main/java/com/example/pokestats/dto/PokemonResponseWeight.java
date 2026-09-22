@@ -6,7 +6,7 @@ public class PokemonResponseWeight {
 
 	private List<PokemonWeight> pokeWeight;
 
-	public List<PokemonWeight> getPokemonInfo() {
+	public List<PokemonWeight> getPokemonWeight() {
 		return pokeWeight;
 	}
 

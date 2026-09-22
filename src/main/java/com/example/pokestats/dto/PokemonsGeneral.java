@@ -9,9 +9,18 @@ import lombok.Data;
 @Builder
 public class PokemonsGeneral {
 
+	private int count;
 	private String next;
 	private String previous;
 	private ArrayList<PokemonUri> results;
+
+	public int getCount() {
+		return count;
+	}
+
+	public void setCount(int count) {
+		this.count = count;
+	}
 
 	public String getNext() {
 		return next;

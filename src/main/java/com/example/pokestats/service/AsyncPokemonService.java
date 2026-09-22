@@ -3,8 +3,10 @@ package com.example.pokestats.service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,7 +22,7 @@ import com.example.pokestats.mapper.HeightMapper;
 import com.example.pokestats.mapper.WeightMapper;
 
 @Service
-public class PokemonService {
+public class AsyncPokemonService {
 
 	@Autowired
 	private WebClient webClient;
@@ -135,6 +137,33 @@ public class PokemonService {
 
 		rsp.setPokemonInfo(expMapper.toPokeExp(list));
 		return rsp;
+	}
+
+	@Async
+	public CompletableFuture<PokemonResponseWeight> findWeight(Long offset) throws InterruptedException {
+
+		ArrayList<PokemonInfo> pokeInfo = new ArrayList<>();
+
+		getPokemonNextWebClientOffset(pokeInfo, offset);
+
+		pokeInfo.sort(Comparator.comparingInt(PokemonInfo::getWeight).reversed());
+		List<PokemonInfo> list = pokeInfo.subList(0, 5);
+		PokemonResponseWeight rsp = new PokemonResponseWeight();
+
+		rsp.setPokemonInfo(weightMapper.toPokeWeight(list));
+		return CompletableFuture.completedFuture(rsp);
+	}
+
+	public void getPokemonNextWebClientOffset(ArrayList<PokemonInfo> pokeInfo, Long offset) {
+
+		PokemonsGeneral pokemonGeneral = webClient.get()
+				.uri(uriBuilder -> uriBuilder.path("/api/v2/pokemon/").queryParam("offset", offset.toString()).queryParam("limit", "250").build())
+				.retrieve().bodyToMono(PokemonsGeneral.class).block();
+
+		for (PokemonUri uri : pokemonGeneral.getResults()) {
+			pokeInfo.add(webClient.get().uri(uri.getUrl()).retrieve().bodyToMono(PokemonInfo.class).block());
+
+		}
 	}
 
 }

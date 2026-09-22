@@ -3,7 +3,7 @@ package com.example.pokestats.dto;
 public class PokemonExp {
 
 	private String name;
-	private String base_experience;
+	private Long base_experience;
 
 	public String getName() {
 		return name;
@@ -13,11 +13,11 @@ public class PokemonExp {
 		this.name = name;
 	}
 
-	public String getBase_experience() {
+	public Long getBase_experience() {
 		return base_experience;
 	}
 
-	public void setBase_experience(String base_experience) {
+	public void setBase_experience(Long base_experience) {
 		this.base_experience = base_experience;
 	}
 

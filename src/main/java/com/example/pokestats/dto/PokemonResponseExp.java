@@ -6,11 +6,11 @@ public class PokemonResponseExp {
 
 	private List<PokemonExp> pokeExp;
 
-	public List<PokemonExp> getPokemonInfo() {
+	public List<PokemonExp> getPokemonExp() {
 		return pokeExp;
 	}
 
-	public void setPokemonInfo(List<PokemonExp> pokeExp) {
+	public void setPokemonExp(List<PokemonExp> pokeExp) {
 		this.pokeExp = pokeExp;
 	}
 
